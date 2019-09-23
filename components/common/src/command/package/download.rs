@@ -237,7 +237,9 @@ impl<'a> DownloadTask<'a> {
                 // the stable channel, but for now, error.
                 ui.warn(format!("No packages matching ident {} for exist in the '{}' channel",
                                 ident, self.channel))?;
-                Err(Error::PackageNotFound(format!("{} in channel {}", ident, self.channel).to_string()))
+                Err(Error::PackageNotFound(
+                    format!("{} in channel {}", ident, self.channel).to_string(),
+                ))
             }
             Err(e) => {
                 debug!("error fetching ident {}: {:?}", ident, e);
@@ -260,6 +262,8 @@ impl<'a> DownloadTask<'a> {
         if self.is_artifact_cached(package) {
             debug!("Found {} in artifact cache, skipping remote download",
                    package.ident);
+            ui.status(Status::Skipping,
+                      format!("because {} was found in downloads directory", package.ident))?;
         } else if let Err(err) = retry(delay::Fixed::from(RETRY_WAIT).take(RETRIES), fetch_artifact)
         {
             return Err(Error::DownloadFailed(format!("We tried {} times but \
