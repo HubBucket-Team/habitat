@@ -923,6 +923,8 @@ fn sub_pkg_download() -> App<'static, 'static> {
             "One or more Habitat package identifiers (ex: acme/redis)")
     (@arg PKG_TARGET: --target -t +takes_value {valid_target}
             "Target architecture to fetch. Allowable options are one of (TODO ADD THIS)")
+    (@arg VERIFY: --verify
+            "Verify package integrity after download (Warning: this can be slow)")
     );
     sub
 }

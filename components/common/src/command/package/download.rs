@@ -82,13 +82,14 @@ pub fn start<U>(ui: &mut U,
                 idents: Vec<PackageIdent>,
                 target: PackageTarget,
                 download_path: Option<&PathBuf>,
-                token: Option<&str>)
+                token: Option<&str>,
+                verify: bool)
                 -> Result<()>
     where U: UIWriter
 {
     debug!("Starting download with url: {}, channel: {}, product: {}, version: {}, target: {}, \
-            download_path: {:?}, token: {:?}",
-           url, channel, product, version, target, download_path, token);
+            download_path: {:?}, token: {:?}, verify: {}",
+           url, channel, product, version, target, download_path, token, verify);
 
     let key_download_path = &path_helper(download_path, "keys", &cache_key_path::<PathBuf>(None));
     debug!("install key_download_path: {:?}", key_download_path);
@@ -109,7 +110,8 @@ pub fn start<U>(ui: &mut U,
                               token,
                               channel,
                               artifact_download_path,
-                              key_download_path };
+                              key_download_path,
+                              verify };
 
     let downloaded_artifacts: Vec<PackageArchive> = task.execute(ui).unwrap();
 
@@ -128,6 +130,7 @@ struct DownloadTask<'a> {
     /// The path to the local artifact cache (e.g., /hab/cache/artifacts)
     artifact_download_path: &'a Path,
     key_download_path: &'a Path,
+    verify: bool,
 }
 
 impl<'a> DownloadTask<'a> {
@@ -232,7 +235,7 @@ impl<'a> DownloadTask<'a> {
                 // heavyweight process, and probably a bad idea in the context of
                 // what's a normally a batch process. It might be ok to fall back to
                 // the stable channel, but for now, error.
-                ui.warn(format!("No releases of {} for exist in the '{}' channel",
+                ui.warn(format!("No packages matching ident {} for exist in the '{}' channel",
                                 ident, self.channel))?;
                 Err(Error::PackageNotFound(format!("{} in channel {}", ident, self.channel).to_string()))
             }
@@ -267,7 +270,6 @@ impl<'a> DownloadTask<'a> {
 
         // At this point the artifact is in the cache...
         let mut artifact = PackageArchive::new(self.cached_artifact_path(package));
-        ui.status(Status::Verifying, artifact.ident()?)?;
         self.verify_artifact(ui, package, &mut artifact)?;
         Ok(artifact)
     }
@@ -329,8 +331,12 @@ impl<'a> DownloadTask<'a> {
                                                      package.to_string())));
         }
 
+        // Is this even possible? We specify the target in fetch_package above, so we should never
+        // be given a
         let artifact_target = artifact.target()?;
         if package.target != artifact_target {
+            debug!("Got wrong package target, expected {}, got {}",
+                   artifact_target, package.target);
             return Err(Error::HabitatCore(hcore::Error::WrongActivePackageTarget(
                 package.target,
                 artifact_target,
@@ -339,11 +345,16 @@ impl<'a> DownloadTask<'a> {
 
         let nwr = artifact::artifact_signer(&artifact.path)?;
         if SigKeyPair::get_public_key_path(&nwr, self.key_download_path).is_err() {
+            ui.status(Status::Downloading,
+                      format!("Public key for signer {:?}", nwr))?;
             self.fetch_origin_key(ui, &nwr, self.token)?;
         }
 
-        artifact.verify(&self.key_download_path)?;
-        debug!("Verified {} signed by {}", package, &nwr);
+        if self.verify {
+            ui.status(Status::Verifying, artifact.ident()?)?;
+            artifact.verify(&self.key_download_path)?;
+            debug!("Verified {} signed by {}", package, &nwr);
+        }
         Ok(())
     }
 

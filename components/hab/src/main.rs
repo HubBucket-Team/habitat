@@ -548,6 +548,7 @@ fn sub_pkg_download(ui: &mut UI, m: &ArgMatches<'_>, _feature_flags: FeatureFlag
     install_sources_from_file.append(&mut install_sources);
 
     let target = target_from_matches(m)?;
+    let verify = verify_from_matches(m);
 
     init();
 
@@ -559,7 +560,8 @@ fn sub_pkg_download(ui: &mut UI, m: &ArgMatches<'_>, _feature_flags: FeatureFlag
                                               install_sources_from_file,
                                               target,
                                               download_dir.as_ref(),
-                                              token.as_ref().map(String::as_str))?;
+                                              token.as_ref().map(String::as_str),
+                                              verify)?;
     Ok(())
 }
 
@@ -1659,6 +1661,8 @@ fn ident_from_str_helper(s: &str, file: &str) -> Result<PackageIdent> {
                                                               s, file))
                              })
 }
+
+fn verify_from_matches(matches: &ArgMatches<'_>) -> bool { matches.is_present("VERIFY") }
 
 fn download_dir_from_matches(matches: &ArgMatches<'_>) -> Option<PathBuf> {
     matches.value_of("DOWNLOAD_DIRECTORY").map(PathBuf::from)
